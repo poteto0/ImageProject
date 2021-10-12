@@ -3,6 +3,7 @@ import imageProcessing as ip
 import numpy as np
 import math
 import widthScanner
+import rotateImage as rimg
 
 def lengthMeasure(img, filename):
     """--- 画像の前処理 ---"""
@@ -26,77 +27,66 @@ def lengthMeasure(img, filename):
         btarget = np.zeros((h, w), np.uint8) # ターゲット描画用に空画像を生成
         btarget[labelImages == target_lb_id] = 255 # ターゲットを取得する
     
-        """--- 個体の長さを測る ---
-           物体の輪郭を抽出して、三次関数フィッティング"""
-        contours, _ = cv2.findContours(btarget, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for cnt in contours: # 要素を取得
-            
-            cv2.drawContours(res,[cnt],0,(0,0,255),1) # 輪郭の描画
         
-        # 回帰計算 #
-        ypts, xpts = np.where(btarget == 255)
-        rv = np.polyfit(xpts ,ypts,  3) # 3次回帰
+        """ 回帰計算 + 長さの測定 """
+        tot_len = 0
+        by = 0
+        ypts, xpts = np.where(btarget == 255) # オブジェクトのある座標を取得
+        rv = np.polyfit(xpts ,ypts, 3) # 3次回帰
         expr = np.poly1d(rv)
         for x in range(tobjx, tobjx+tobjw):
             v = expr(x)
-            if(v > len(labelImages)-1):
+            if(v > len(labelImages)-1): # 最大値処理
                 v = len(labelImages)-1
+            # 長さの測定 #
+            if x == tobjx:
+                by = v
+                bx = x
+            elif  x != tobjx:
+                sdist = math.sqrt((bx-x)**2 + (by-v)**2)
+                tot_len += sdist
+                by = v
+                bx = x
+                
             res[int(v),x,:] = (255,255,0)   # 曲線描画
+            # 線の描画 #   
+            cv2.line(res, (int(x), int(v)), (int(bx), int(by)), (255,255,255), 2)
+            
+        # 長さを左隅に記載 #
+        cv2.putText(res, str('{:.1f}'.format(tot_len)), (int(tobjx), int(tobjy)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255), 1,cv2.LINE_AA)
         
         # ターゲットオブジェクト認識領域描画 #
         cv2.rectangle(res,(tobjx,tobjy),(tobjx+tobjw,tobjy+tobjh),(0,255,255),1)
         
-        """ 長さの測定 """
+        """ 幅の測定 """
         # resをグレースケールに(チャンネル数を減らす) #
         bres = cv2.cvtColor(res, cv2.COLOR_BGR2GRAY)
         # 幅を測る
         offsetx = 10
-        incx = 16
+        incx = 16 # 幅を測るステップ幅
         cary = np.zeros((incx,), np.float32)
         carx = np.zeros((incx,), np.float32)
-        lbno = 1
+        lbno = 1 # 幅を測った場所のID
         for sx in range(tobjx+incx, tobjx+tobjw-incx, incx):
             cary = np.zeros((incx,), np.uint8)
-            for x in range(sx, sx+incx):
+            for x in range(sx, sx+incx): # 横方向にオブジェクトの座標を取得
                 vy = expr(x)
                 carx[sx-x] = x
                 cary[sx-x] = vy
-            rv1 = np.polyfit(carx ,cary,1)
+            rv1 = np.polyfit(carx ,cary,1) # 1次回帰
             expr1 = np.poly1d(rv1)
     
-            mx = sx + incx // 2
-            my = expr(mx)
+            mx = sx + incx // 2 # x座標の平均
+            my = expr(mx) # その時のy座標(1次回帰から)
     
-            # 直行を求める
+            # 直行を求める #
             ex = widthScanner.WidthScanner(rv1, mx, my)
-            spt, ept, dist = ex.getPoints(bres)
+            spt, ept, dist = ex.getPoints(bres) # 座標と長さを取得
+            # 幅の描画 #
             cv2.line(res, (int(spt[0]), int(spt[1])), (int(ept[0]), int(ept[1])), (255,0,0), 1, lineType=cv2.LINE_AA)
-    
             cv2.putText(res, str('{:.1f}'.format(dist)), (int(spt[0]-6), int(spt[1])-8), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1,cv2.LINE_AA)
-            #print('%2d.直径 %.2f' % (lbno, dist))
+            
             lbno += 1
-        # 長さを測る #
-        tot_len = 0
-        scan_flag = False # すでにスキャンした部分の判断
-        by = 0
-        vy = expr(x)
-        for x in range(tobjx, tobjx+tobjw):
-            if scan_flag == False and bres[int(vy), x] == 255:
-                scan_flag = True
-                vy = expr(x)
-                bx = x
-                by = vy
-            elif scan_flag == True :
-                if bres[int(vy), x] == 255:
-                    vy = expr(x)
-                    sdist = math.sqrt((bx - x)** 2 + (by - vy) ** 2)
-                    tot_len += sdist
-                    cv2.line(res, (int(x), int(vy)), (int(bx), int(by)), (255,0,255), 2, lineType=cv2.LINE_AA)
-                    bx = x
-                    by = vy
-                else:
-                    break
-        print(tot_len)
         
     # 画像保存 #
     cv2.imwrite(f'test/{filename}', res)
