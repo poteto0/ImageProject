@@ -1,48 +1,37 @@
 import cv2
-import lengthMeasure as lm
 import rotateImage as rimg
+import extraction
+import numpy as np
 import os
+from PIL import Image, ImageSequence
+from imageProcessing import imageProcessing
 
-""""--- 画像の回転 ---
-    画像が単個体であれば有用"""
-"""
-# imagesディレクトリを探索 #
+# tif画像に変換する
+name = "test"# 大元のファイル名
+os.mkdir(f"images/{name}")
 for dirname, _, filenames in os.walk('images/'):
     for filename in filenames:
         if filename != ".DS_Store":
-            
             image_file = dirname + filename
-            img = cv2.imread(image_file)
-            deg = get_degree.get_degree(img) # 角度の算出
-            rotate_img = ndimage.rotate(img, deg) # 回転
-            
-            # 書き出し #
-            cv2.imwrite(f'rotate_images/{filename}', rotate_img)
-"""
+            img = Image.open(image_file)
+            itr = ImageSequence.Iterator(img)
+            length = sum(1 for _ in itr)
+            for count in range(length):
+                img = itr[count] # 2ページ目
+                img = np.array(img)
+                cv2.imwrite(f'images/{name}/{count}.png', img)
 
-""" まずは画像をオブジェクト毎に取得して回転 """
-for dirname, _, filenames in os.walk('images/'): # OSを探索
+# 前処理用 #
+ip = imageProcessing(thres1=0, thres2=225, alpha=1.3, beta=40)
+for dirname, _, filenames in os.walk(f'images/{name}/'):
     for filename in filenames:
         if filename != ".DS_Store":
             
             image_file = dirname + filename
             img = cv2.imread(image_file)
+            new_img = ip.doProcessing(img, filename)
             # 画像の回転を行った時(単個体) #
-            #(w_list, h_list, aspect_list) = contour_extraction.contour_extraction(img, filename) # 輪郭抽出と書き出し
-            # 画像を回転していない時 #
-            rotate_img = rimg.rotateImage(img, filename) # 画像回転
-
-""" オブジェクトの長さを取得 """
-for dirname, _, filenames in os.walk('rotate_images/'):
-    for filename in filenames:
-        if filename != ".DS_Store":
-            
-            image_file = dirname + filename
-            img = cv2.imread(image_file)
-            # 画像の回転を行った時(単個体) #
-            #(w_list, h_list, aspect_list) = contour_extraction.contour_extraction(img, filename) # 輪郭抽出と書き出し
-            # 画像を回転していない時 #
-            lm.lengthMeasure(img, filename)
+            extraction.extract(new_img, img, filename)
 
 
             
