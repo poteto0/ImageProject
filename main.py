@@ -8,8 +8,8 @@ from imageProcessing import imageProcessing
 
 # tif画像に変換する
 name = "test"# 大元のファイル名
-os.mkdir(f"images/{name}")
-for dirname, _, filenames in os.walk('images/'):
+os.mkdir(f"image/{name}")
+for dirname, _, filenames in os.walk('image/'):
     for filename in filenames:
         if filename != ".DS_Store":
             image_file = dirname + filename
