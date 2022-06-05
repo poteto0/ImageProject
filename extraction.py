@@ -2,7 +2,35 @@ import cv2
 import numpy as np
 import math
 
-def extract(new_img, img, filename):
+def lengthMeasure(res, btarget, tobjx, tobjw, labelImages):
+    tot_len = 0
+    by = 0
+    ypts, xpts = np.where(btarget == 255) # オブジェクトのある座標を取得
+    rv = np.polyfit(xpts ,ypts, 3) # 3次回帰
+    expr = np.poly1d(rv)
+    for x in range(tobjx, tobjx+tobjw):
+        v = expr(x)
+        if(v > len(labelImages)-1): # 最大値処理
+            v = len(labelImages)-1
+        # 長さの測定 #
+        if x == tobjx:
+            by = v
+            bx = x
+        elif  x != tobjx:
+            sdist = math.sqrt((bx-x)**2 + (by-v)**2)
+            tot_len += sdist
+            by = v
+            bx = x
+            
+    if tot_len > 100:
+        for x in range(tobjx, tobjx+tobjw):
+            v = expr(x)        
+            res[int(v),x,:] = (255,255,0)   # 曲線描画
+    
+    return (res, tot_len)
+    
+
+def extract(new_img, img, filename, dir_name):
     # maskの作成
     msk_img = cv2.merge((new_img, new_img, new_img)) # マスクのチャンネル数を3に
     res = cv2.bitwise_and(img, msk_img)
@@ -21,32 +49,15 @@ def extract(new_img, img, filename):
         h, w = img.shape[:2] # (画像の)大きさ
         btarget = np.zeros((h, w), np.uint8) # ターゲット描画用に空画像を生成
         btarget[labelImages == target_lb_id] = 255 # ターゲットを取得する
-    
-        tot_len = 0
-        by = 0
-        ypts, xpts = np.where(btarget == 255) # オブジェクトのある座標を取得
-        rv = np.polyfit(xpts ,ypts, 3) # 3次回帰
-        expr = np.poly1d(rv)
-        for x in range(tobjx, tobjx+tobjw):
-            v = expr(x)
-            if(v > len(labelImages)-1): # 最大値処理
-                v = len(labelImages)-1
-            # 長さの測定 #
-            if x == tobjx:
-                by = v
-                bx = x
-            elif  x != tobjx:
-                sdist = math.sqrt((bx-x)**2 + (by-v)**2)
-                tot_len += sdist
-                by = v
-                bx = x
-                
-            #res[int(v),x,:] = (255,255,0)   # 曲線描画
         
-        cv2.putText(res, f"tot_len:{tot_len}",(int(tobjx), int(tobjy)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1,cv2.LINE_AA)
+        tot_len = 0
+        (img, tot_len) = lengthMeasure(img, btarget, tobjx, tobjw, labelImages)
+        
+        if tot_len>100:
+            cv2.putText(img, f"tot_len:{tot_len}",(int(tobjx), int(tobjy)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1,cv2.LINE_AA)
         
             
     # 画像保存 #
-    cv2.imwrite(f'extraction_images/{filename}', res)
+    cv2.imwrite(f'extraction/{dir_name}/{filename}', img)
     
     return res

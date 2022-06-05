@@ -12,6 +12,7 @@ class imageProcessing:
     
     # 前処理の実行 #
     def doProcessing(self, img, filename="null"):
+        img = self.adjust(img, filename)
         img = self.gaussian(img) # ガウシアンフィルタ
         img = self.binarization(img, filename) # 二値化
         img = self.morphology(img, filename) # モルフォロジー変換
@@ -24,8 +25,11 @@ class imageProcessing:
         # グレースケールに変換する。
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # 2値化する
-        ret, img = cv2.threshold(img, self.thres1, self.thres2, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        #bin_img = cv2.bitwise_not(bin_img)
+        ret, img = cv2.threshold(img,self.thres1,self.thres2,cv2.THRESH_BINARY_INV)
+        #img = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+            #cv2.THRESH_BINARY,11,2)
+        #ret, img = cv2.threshold(img, self.thres1, self.thres2, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        img = cv2.bitwise_not(img)
         
         #--- 保存 ---#
         #cv2.imwrite(f"gray/{filename}", img) # グレースケール
@@ -37,12 +41,12 @@ class imageProcessing:
     def morphology(self, img, filename="null"):
         #--- モルフォロジー変換 ---#
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)) # カーネルサイズ
-        img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel, iterations=1)
-        img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=1)
-        #mor_img = cv2.dilate(img,kernel,iterations = 1)
+        #img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel, iterations=1)
+        img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=2)
+        img = cv2.dilate(img,kernel,iterations = 5)
         
         #--- 保存 ---#
-        #cv2.imwrite(f"morphology/{self.dir_name}/{filename}", img)
+        cv2.imwrite(f"morphology/{self.dir_name}/{filename}", img)
         
         return img
     
@@ -55,7 +59,7 @@ class imageProcessing:
         img = np.clip(img, 0, 255).astype(np.uint8)
         
         #--- 保存 ---#
-        #cv2.imwrite(f"adjust/{self.dir_name}/{filename}", img)
+        cv2.imwrite(f"adjust/{self.dir_name}/{filename}", img)
         
         return img
     
